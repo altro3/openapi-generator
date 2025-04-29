@@ -461,10 +461,9 @@ public class CodegenConstants {
             + "For example, when openapi operation produces one of \"application/json\" and \"application/xml\" content types "
             + "will be generated only one method for both content types. Otherwise for each content type will be generated different method.";
 
-    public static final String GROUP_BY_REQUEST_AND_RESPONSE_CONTENT_TYPE = "groupByRequestAndResponseContentType";
-    public static final String GROUP_BY_REQUEST_AND_RESPONSE_CONTENT_TYPE_DESC =
-        "Group server or client methods by request body and response content types. "
-        + "For example, when openapi operation consumes \"application/json\" and \"application/xml\" content type and also api response "
-        + "has content with the same content types, 2 different methods will be generated. The content of the request and response types will match. "
-        + "Otherwise, will be generated 4 methods - for each combination of request body content type and response content type.";
+    public static final String GROUP_BY_REQUEST_CONTENT_TYPE = "groupByRequestContentType";
+    public static final String GROUP_BY_REQUEST_CONTENT_TYPE_DESC =
+        "Group server or client methods by request content types. "
+            + "For example, when openapi operation consumes one of \"application/json\" and \"application/xml\" content types "
+            + "will be generated only one method for both content types. Otherwise for each content type will be generated different method.";
 }

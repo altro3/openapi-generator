@@ -300,15 +300,18 @@ public class DefaultCodegen implements CodegenConfig {
     protected boolean removeEnumValuePrefix = false;
 
     // Support legacy logic for evaluating discriminators
-    @Setter protected boolean legacyDiscriminatorBehavior = true;
+    @Setter
+    protected boolean legacyDiscriminatorBehavior = true;
 
     // Specify what to do if the 'additionalProperties' keyword is not present in a schema.
     // See CodegenConstants.java for more details.
-    @Setter protected boolean disallowAdditionalPropertiesIfNotPresent = true;
+    @Setter
+    protected boolean disallowAdditionalPropertiesIfNotPresent = true;
 
     // If the server adds new enum cases, that are unknown by an old spec/client, the client will fail to parse the network response.
     // With this option enabled, each enum will have a new case, 'unknown_default_open_api', so that when the server sends an enum case that is not known by the client/spec, they can safely fallback to this case.
-    @Setter protected boolean enumUnknownDefaultCase = false;
+    @Setter
+    protected boolean enumUnknownDefaultCase = false;
     protected String enumUnknownDefaultCaseName = "unknown_default_open_api";
 
     // make openapi available to all methods
@@ -331,9 +334,10 @@ public class DefaultCodegen implements CodegenConfig {
     protected boolean addSuffixToDuplicateOperationNicknames = true;
 
     // Whether to automatically hardcode params that are considered Constants by OpenAPI Spec
-    @Setter protected boolean autosetConstants = false;
     @Setter
-    protected boolean groupByRequestAndResponseContentType = true;
+    protected boolean autosetConstants = false;
+    @Setter
+    protected boolean groupByRequestContentType = true;
     @Setter
     protected boolean groupByResponseContentType = true;
 
@@ -395,7 +399,7 @@ public class DefaultCodegen implements CodegenConfig {
         convertPropertyToBooleanAndWriteBack(CodegenConstants.DISALLOW_ADDITIONAL_PROPERTIES_IF_NOT_PRESENT, this::setDisallowAdditionalPropertiesIfNotPresent);
         convertPropertyToBooleanAndWriteBack(CodegenConstants.ENUM_UNKNOWN_DEFAULT_CASE, this::setEnumUnknownDefaultCase);
         convertPropertyToBooleanAndWriteBack(CodegenConstants.AUTOSET_CONSTANTS, this::setAutosetConstants);
-        convertPropertyToBooleanAndWriteBack(CodegenConstants.GROUP_BY_REQUEST_AND_RESPONSE_CONTENT_TYPE, this::setGroupByRequestAndResponseContentType);
+        convertPropertyToBooleanAndWriteBack(CodegenConstants.GROUP_BY_REQUEST_CONTENT_TYPE, this::setGroupByRequestContentType);
         convertPropertyToBooleanAndWriteBack(CodegenConstants.GROUP_BY_RESPONSE_CONTENT_TYPE, this::setGroupByResponseContentType);
     }
 
@@ -434,7 +438,7 @@ public class DefaultCodegen implements CodegenConfig {
     private void registerMustacheLambdas() {
         ImmutableMap<String, Lambda> lambdas = addMustacheLambdas().build();
 
-        if (lambdas.size() == 0) {
+        if (lambdas.isEmpty()) {
             return;
         }
 
@@ -1225,17 +1229,81 @@ public class DefaultCodegen implements CodegenConfig {
     private void divideOperationByRequestBody(OpenAPI openAPI, String path, PathItem.HttpMethod httpMethod, Operation op,
                                               List<Operation> additionalOps, Map<String, Integer> operationIndexes) {
         RequestBody body = ModelUtils.getReferencedRequestBody(openAPI, op.getRequestBody());
-        if (body == null || body.getContent() == null) {
+        var rqContentTypes = new ArrayList<String>();
+        if (body != null && body.getContent() != null) {
+            rqContentTypes.addAll(body.getContent().keySet());
+            op.setRequestBody(body);
+        }
+        var rsContentTypes = new ArrayList<String>();
+        if (op.getResponses() != null) {
+            for (var response : op.getResponses().values()) {
+                for (var rsContentType : response.getContent().keySet()) {
+                    if (!rsContentTypes.contains(rsContentType)) {
+                        rsContentTypes.add(rsContentType);
+                    }
+                }
+            }
+        }
+
+        if (rqContentTypes.size() <= 1 && rsContentTypes.size() <= 1) {
             return;
         }
-        op.setRequestBody(body);
-        Content content = body.getContent();
-        if (content.size() <= 1) {
-            return;
+
+        Content rqContent = body != null ? body.getContent() : null;
+
+        Operation operation = new Operation()
+            .deprecated(op.getDeprecated())
+            .callbacks(op.getCallbacks())
+            .description(op.getDescription())
+            .extensions(op.getExtensions() != null ? new LinkedHashMap<>(op.getExtensions()) : null)
+            .externalDocs(op.getExternalDocs())
+            .operationId(calcOperationId(path, httpMethod, op, operationIndexes))
+            .parameters(op.getParameters())
+            .security(op.getSecurity())
+            .servers(op.getServers())
+            .summary(op.getSummary())
+            .tags(op.getTags());
+
+        if (groupByRequestContentType && groupByResponseContentType) {
+            var opsByContentType = new HashMap<String, Operation>();
+            if (rqContent != null) {
+
+                var mediaTypesByContentTypes = new HashMap<String, List<MediaType>>();
+
+                for (var mtEntry : rqContent.entrySet()) {
+                    var mediaType = mtEntry.getValue();
+                    for (var existedMt : mediaTypesByContentTypes.values()) {
+
+                    }
+                    if (operation == null) {
+                        operation = new Operation()
+                            .deprecated(op.getDeprecated())
+                            .callbacks(op.getCallbacks())
+                            .description(op.getDescription())
+                            .extensions(op.getExtensions() != null ? new LinkedHashMap<>(op.getExtensions()) : null)
+                            .externalDocs(op.getExternalDocs())
+                            .operationId(calcOperationId(path, httpMethod, op, operationIndexes))
+                            .parameters(op.getParameters())
+                            .security(op.getSecurity())
+                            .servers(op.getServers())
+                            .summary(op.getSummary())
+                            .tags(op.getTags());
+                    }
+                                                .requestBody(new RequestBody()
+                        .description(body.getDescription())
+                        .extensions(body.getExtensions())
+                        .content(new Content()
+                            .addMediaType(contentType, mediaType))
+                    );
+
+                }
+            }
         }
-        var firstEntry = content.entrySet().iterator().next();
+
+        var firstEntry = rqContent.entrySet().iterator().next();
         var mediaTypesToRemove = new ArrayList<String>();
-        for (var entry : content.entrySet()) {
+        for (var entry : rqContent.entrySet()) {
+            rqContentTypes.add(entry.getKey());
             var contentType = entry.getKey();
             MediaType mediaType = entry.getValue();
             if (mediaTypesToRemove.contains(contentType) || contentType.equals(firstEntry.getKey())) {
@@ -1245,23 +1313,23 @@ public class DefaultCodegen implements CodegenConfig {
             // group by response content type
             if (groupByResponseContentType) {
                 if (firstEntry.getValue().equals(mediaType)) {
-                    if (!groupByRequestAndResponseContentType) {
+                    if (!groupByRequestContentType) {
                         foundSameOpSignature = true;
                     }
                 } else {
                     for (var additionalOp : additionalOps) {
-                        RequestBody additionalBody = ModelUtils.getReferencedRequestBody(openAPI, additionalOp.getRequestBody());
-                        if (additionalBody == null || additionalBody.getContent() == null) {
+                        RequestBody additionalOpBody = ModelUtils.getReferencedRequestBody(openAPI, additionalOp.getRequestBody());
+                        if (additionalOpBody == null || additionalOpBody.getContent() == null) {
                             return;
                         }
-                        for (var addContentEntry : additionalBody.getContent().entrySet()) {
+                        for (var addContentEntry : additionalOpBody.getContent().entrySet()) {
                             if (addContentEntry.getValue().equals(mediaType)) {
                                 foundSameOpSignature = true;
                                 break;
                             }
                         }
                         if (foundSameOpSignature) {
-                            additionalBody.getContent().put(contentType, mediaType);
+                            additionalOpBody.getContent().put(contentType, mediaType);
                             break;
                         }
                     }
@@ -1280,7 +1348,7 @@ public class DefaultCodegen implements CodegenConfig {
                 .deprecated(op.getDeprecated())
                 .callbacks(op.getCallbacks())
                 .description(op.getDescription())
-                .extensions(op.getExtensions() != null ? new LinkedHashMap<>(op.getExtensions()) : new LinkedHashMap<>())
+                .extensions(op.getExtensions() != null ? new LinkedHashMap<>(op.getExtensions()) : null)
                 .externalDocs(op.getExternalDocs())
                 .operationId(calcOperationId(path, httpMethod, op, operationIndexes))
                 .parameters(op.getParameters())
@@ -1298,7 +1366,7 @@ public class DefaultCodegen implements CodegenConfig {
             );
         }
         if (!mediaTypesToRemove.isEmpty()) {
-            content.entrySet().removeIf(stringMediaTypeEntry -> mediaTypesToRemove.contains(stringMediaTypeEntry.getKey()));
+            content.entrySet().removeIf(entry -> mediaTypesToRemove.contains(entry.getKey()));
         }
     }
 
@@ -1335,7 +1403,7 @@ public class DefaultCodegen implements CodegenConfig {
             var apiResponses = entry.getValue();
             var requestBody = op.getRequestBody();
             // group by requestBody contentType
-            if (groupByRequestAndResponseContentType
+            if (groupByRequestContentType
                 && requestBody != null
                 && requestBody.getContent() != null
                 && !requestBody.getContent().containsKey(contentType)) {
@@ -2081,8 +2149,8 @@ public class DefaultCodegen implements CodegenConfig {
         if (supportsDividingOperationsByContentType()) {
             cliOptions.add(CliOption.newBoolean(CodegenConstants.GROUP_BY_RESPONSE_CONTENT_TYPE,
                 CodegenConstants.GROUP_BY_RESPONSE_CONTENT_TYPE_DESC).defaultValue(Boolean.TRUE.toString()));
-            cliOptions.add(CliOption.newBoolean(CodegenConstants.GROUP_BY_REQUEST_AND_RESPONSE_CONTENT_TYPE,
-                CodegenConstants.GROUP_BY_REQUEST_AND_RESPONSE_CONTENT_TYPE_DESC).defaultValue(Boolean.TRUE.toString()));
+            cliOptions.add(CliOption.newBoolean(CodegenConstants.GROUP_BY_REQUEST_CONTENT_TYPE,
+                CodegenConstants.GROUP_BY_REQUEST_CONTENT_TYPE_DESC).defaultValue(Boolean.TRUE.toString()));
         }
 
         // option to change how we process + set the data in the discriminator mapping
@@ -5964,9 +6032,8 @@ public class DefaultCodegen implements CodegenConfig {
         String operationId = operation.getOperationId();
 
         if (StringUtils.isBlank(operationId)) {
-            String tmpPath = path;
-            tmpPath = tmpPath.replaceAll("\\{", "");
-            tmpPath = tmpPath.replaceAll("\\}", "");
+            String tmpPath = path.replaceAll("\\{", "")
+                .replaceAll("}", "");
             String[] parts = (tmpPath + "/" + httpMethod).split("/");
             StringBuilder builder = new StringBuilder();
             if ("/".equals(tmpPath)) {
@@ -5974,8 +6041,8 @@ public class DefaultCodegen implements CodegenConfig {
                 builder.append("root");
             }
             for (String part : parts) {
-                if (part.length() > 0) {
-                    if (builder.toString().length() == 0) {
+                if (!part.isEmpty()) {
+                    if (builder.length() == 0) {
                         part = Character.toLowerCase(part.charAt(0)) + part.substring(1);
                     } else {
                         part = camelize(part);

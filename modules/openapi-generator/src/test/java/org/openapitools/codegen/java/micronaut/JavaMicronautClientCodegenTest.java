@@ -461,7 +461,7 @@ public class JavaMicronautClientCodegenTest extends AbstractMicronautCodegenTest
     public void testMultipleContentTypesToPathTrueTrue() {
 
         var codegen = new JavaMicronautClientCodegen();
-        codegen.setGroupByRequestAndResponseContentType(true);
+        codegen.setGroupByRequestContentType(true);
         codegen.setGroupByResponseContentType(true);
         String outputPath = generateFiles(codegen, "src/test/resources/3_0/java/multiple-content-types.yaml", CodegenConstants.APIS, CodegenConstants.MODELS);
 
@@ -501,7 +501,7 @@ public class JavaMicronautClientCodegenTest extends AbstractMicronautCodegenTest
     public void testMultipleContentTypesToPathTrueFalse() {
 
         var codegen = new JavaMicronautClientCodegen();
-        codegen.setGroupByRequestAndResponseContentType(true);
+        codegen.setGroupByRequestContentType(true);
         codegen.setGroupByResponseContentType(false);
         String outputPath = generateFiles(codegen, "src/test/resources/3_0/java/multiple-content-types.yaml", CodegenConstants.APIS, CodegenConstants.MODELS);
 
@@ -547,7 +547,7 @@ public class JavaMicronautClientCodegenTest extends AbstractMicronautCodegenTest
     public void testMultipleContentTypesToPathFalseTrue() {
 
         var codegen = new JavaMicronautClientCodegen();
-        codegen.setGroupByRequestAndResponseContentType(false);
+        codegen.setGroupByRequestContentType(false);
         codegen.setGroupByResponseContentType(true);
         String outputPath = generateFiles(codegen, "src/test/resources/3_0/java/multiple-content-types.yaml", CodegenConstants.APIS, CodegenConstants.MODELS);
 
@@ -645,7 +645,7 @@ public class JavaMicronautClientCodegenTest extends AbstractMicronautCodegenTest
     public void testMultipleContentTypesToPathFalseFalse() {
 
         var codegen = new JavaMicronautClientCodegen();
-        codegen.setGroupByRequestAndResponseContentType(false);
+        codegen.setGroupByRequestContentType(false);
         codegen.setGroupByResponseContentType(false);
         String outputPath = generateFiles(codegen, "src/test/resources/3_0/java/multiple-content-types.yaml", CodegenConstants.APIS, CodegenConstants.MODELS);
 
@@ -764,7 +764,7 @@ public class JavaMicronautClientCodegenTest extends AbstractMicronautCodegenTest
     public void testMultipleContentTypesWithRefs() {
 
         var codegen = new JavaMicronautClientCodegen();
-        codegen.setGroupByRequestAndResponseContentType(true);
+        codegen.setGroupByRequestContentType(true);
         codegen.setGroupByResponseContentType(true);
         String outputPath = generateFiles(codegen, "src/test/resources/3_0/java/multiple-content-types-2.yaml", CodegenConstants.APIS, CodegenConstants.MODELS);
 
